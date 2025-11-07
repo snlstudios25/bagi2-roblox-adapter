@@ -1,0 +1,12 @@
+{
+  "name": "bagi2-roblox-adapter",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "crypto-js": "^4.2.0",
+    "express": "^4.19.2"
+  }
+}
