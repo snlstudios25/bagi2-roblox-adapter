@@ -75,5 +75,16 @@ app.post("/test/ping", async (_req, res) => {
     res.status(500).json({ success: false });
   }
 });
+app.get("/test/ping", async (req, res) => {
+  try {
+    console.log("[Bagi2] /test/ping (GET) hit");
+    await publishToRoblox({ type: "ping", at: new Date().toISOString() });
+    console.log("[Bagi2] /test/ping forwarded to Roblox");
+    res.json({ success: true });
+  } catch (e) {
+    console.error("[Bagi2] /test/ping error:", e.response?.data || e.message);
+    res.status(500).json({ success: false, error: e.response?.data || e.message });
+  }
+});
 
 app.listen(PORT, () => console.log(`Adapter listening on :${PORT}`));
