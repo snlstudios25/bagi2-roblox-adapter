@@ -4,6 +4,15 @@ import CryptoJS from "crypto-js";
 
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// logger biar keliatan semua request masuk di Render Logs
+app.use((req, _res, next) => {
+  console.log(
+    `[REQ] ${new Date().toISOString()} ${req.method} ${req.originalUrl} ct=${req.headers["content-type"] || "-"}`
+  );
+  next();
+});
 
 const {
   PORT = 3000,
