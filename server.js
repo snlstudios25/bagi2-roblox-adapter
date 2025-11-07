@@ -1,12 +1,12 @@
 // --
 // Creation Date: 2025-11-07
-// Updated: 2025-11-07 (v3)
+// Updated: 2025-11-07 (v4)
 // Change Log:
-// - [FIX] Mengubah sintaks dari CommonJS (require) ke ES Module (import)
-//   untuk menyesuaikan dengan "type": "module" di package.json pengguna.
+// - [FIX] Menambahkan endpoint GET /health untuk merespon health check
+//   Render.com agar deploy bisa berstatus "Live".
+// - [FIX] Memperbaiki typo crypto hmac (sha266 -> sha256).
 // --
 
-// [PERUBAHAN] Menggunakan 'import'
 import express from 'express';
 import crypto from 'crypto';
 import axios from 'axios';
@@ -26,7 +26,15 @@ const PORT = process.env.PORT || 3000;
 const BAGIBAGI_WEBHOOK_TOKEN = process.env.BAGIBAGI_WEBHOOK_TOKEN;
 const ROBLOX_API_KEY = process.env.ROBLOX_API_KEY;
 const ROBLOX_UNIVERSE_ID = process.env.ROBLOX_UNIVERSE_ID;
-const ROBLOX_TOPIC_NAME = process.env.ROBLOX_TOPIC_NAME; // Cth: "bagi2-donations"
+const ROBLOX_TOPIC_NAME = process.env.ROBLOX_TOPIC_NAME; 
+
+// ====================================================================
+// [BARU] Health Check Endpoint untuk Render.com
+// Ini akan menjawab "OK" saat Render melakukan ping ke /health
+app.get('/health', (req, res) => {
+    res.status(200).send('OK');
+});
+// ====================================================================
 
 // Endpoint untuk menerima webhook dari bagi2.co
 app.post('/webhook/bagibagi', async (req, res) => {
@@ -40,7 +48,7 @@ app.post('/webhook/bagibagi', async (req, res) => {
 
     // --- Langkah Validasi Signature ---
     const expectedSignature = crypto
-        .createHmac('sha266', BAGIBAGI_WEBHOOK_TOKEN) // [EDIT] Typo di script saya sebelumnya, harusnya sha256
+        .createHmac('sha256', BAGIBAGI_WEBHOOK_TOKEN) // [FIX] Typo sha266 sudah diperbaiki
         .update(req.rawBody)
         .digest('hex');
 
@@ -61,10 +69,8 @@ app.post('/webhook/bagibagi', async (req, res) => {
             message: donationData.message,
         };
 
-        // URL API V2
         const robloxApiUrl_V2 = `https://apis.roblox.com/cloud/v2/universes/${ROBLOX_UNIVERSE_ID}:publishMessage`;
 
-        // BODY (Payload) V2
         const payloadV2 = {
             topic: ROBLOX_TOPIC_NAME,
             message: JSON.stringify(messageToRoblox)
@@ -72,7 +78,6 @@ app.post('/webhook/bagibagi', async (req, res) => {
 
         console.log(`Sending data to Roblox Topic (v2): ${ROBLOX_TOPIC_NAME}`);
         
-        // Kirim request ke API V2
         await axios.post(robloxApiUrl_V2, payloadV2, {
             headers: {
                 'x-api-key': ROBLOX_API_KEY,
