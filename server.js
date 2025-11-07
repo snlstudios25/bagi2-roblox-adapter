@@ -1,99 +1,115 @@
-import express from "express";
-import axios from "axios";
-import CryptoJS from "crypto-js";
+// --
+// Creation Date: 2025-11-07
+// Updated: 2025-11-07
+// Change Log:
+// - [FIX] Migrasi dari MessagingService API v1 ke v2
+//   (https://apis.roblox.com/cloud/v2/universes/...)
+//   untuk memperbaiki error 'InsufficientScope' yang disebabkan oleh UI permission
+//   Creator Hub yang baru.
+// --
+
+const express = require('express');
+const crypto = require('crypto');
+const axios = require('axios');
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Gunakan express.json() untuk mem-parsing body JSON secara otomatis
+app.use(express.json({
+    verify: (req, res, buf) => {
+        // Simpan raw body untuk validasi signature
+        req.rawBody = buf;
+    }
+}));
 
-// logger biar keliatan semua request masuk di Render Logs
-app.use((req, _res, next) => {
-  console.log(
-    `[REQ] ${new Date().toISOString()} ${req.method} ${req.originalUrl} ct=${req.headers["content-type"] || "-"}`
-  );
-  next();
+const PORT = process.env.PORT || 3000;
+
+// Ambil konfigurasi dari Environment Variables di Render.com
+const BAGIBAGI_WEBHOOK_TOKEN = process.env.BAGIBAGI_WEBHOOK_TOKEN;
+const ROBLOX_API_KEY = process.env.ROBLOX_API_KEY;
+const ROBLOX_UNIVERSE_ID = process.env.ROBLOX_UNIVERSE_ID;
+const ROBLOX_TOPIC_NAME = process.env.ROBLOX_TOPIC_NAME; // Cth: "bagi2-donations"
+
+// Endpoint untuk menerima webhook dari bagi2.co
+app.post('/webhook/bagibagi', async (req, res) => {
+    console.log("Webhook received...");
+
+    const signature = req.get('X-Bagibagi-Signature');
+    if (!signature) {
+        console.error("Validation Failed: No signature header.");
+        return res.status(400).json({ success: false, message: "Validation Failed" });
+    }
+
+    // --- Langkah Validasi Signature ---
+    const expectedSignature = crypto
+        .createHmac('sha256', BAGIBAGI_WEBHOOK_TOKEN)
+        .update(req.rawBody)
+        .digest('hex');
+
+    if (signature !== expectedSignature) {
+        console.error("Validation Failed: Invalid signature.");
+        return res.status(403).json({ success: false, message: "Validation Failed" });
+    }
+
+    console.log("Signature validated successfully.");
+
+    // --- Proses dan Kirim ke Roblox Open Cloud ---
+    try {
+        const donationData = req.body;
+
+        // Siapkan data yang akan dikirim ke Roblox
+        const messageToRoblox = {
+            name: donationData.name,
+            amount: donationData.amount,
+            message: donationData.message,
+        };
+
+        // ====================================================================
+        // [PERUBAHAN UTAMA] Menggunakan API v2
+        // ====================================================================
+        
+        // URL API V2
+        // (Perhatikan formatnya: .../universes/{id}:publishMessage)
+        const robloxApiUrl_V2 = `https://apis.roblox.com/cloud/v2/universes/${ROBLOX_UNIVERSE_ID}:publishMessage`;
+
+        // BODY (Payload) V2
+        // (Topic sekarang ada di dalam body, bersama dengan message)
+        const payloadV2 = {
+            topic: ROBLOX_TOPIC_NAME,
+            message: JSON.stringify(messageToRoblox)
+        };
+        
+        // ====================================================================
+
+        console.log(`Sending data to Roblox Topic (v2): ${ROBLOX_TOPIC_NAME}`);
+        
+        // Kirim request ke API V2
+        await axios.post(robloxApiUrl_V2, payloadV2, {
+            headers: {
+                'x-api-key': ROBLOX_API_KEY,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        console.log("Successfully sent message to Roblox (v2).");
+        // Kirim response sukses kembali ke bagi2.co
+        res.status(200).json({ success: true, message: "Webhook received and processed." });
+
+    } catch (error) {
+        // Tangkap error dengan lebih baik untuk debugging
+        if (error.response) {
+            // Error dari Roblox (misal 4xx, 5xx)
+            console.error("Error forwarding message to Roblox:", error.response.status, error.response.data);
+        } else if (error.request) {
+            // Request terkirim tapi tidak ada respon
+            console.error("Error forwarding message: No response from Roblox.", error.request);
+        } else {
+            // Error saat setup request
+            console.error("Error setting up request to Roblox:", error.message);
+        }
+        res.status(500).json({ success: false, message: "Internal Server Error" });
+    }
 });
 
-const {
-  PORT = 3000,
-  BAGI2_BASE_URL = "https://bagibagi.co",
-  MERCHANT_CODE,
-  API_KEY,
-  ROBLOX_API_KEY,
-  ROBLOX_UNIVERSE_ID,
-  ROBLOX_TOPIC = "bagi2-donations"
-} = process.env;
-
-if (!MERCHANT_CODE || !API_KEY || !ROBLOX_API_KEY || !ROBLOX_UNIVERSE_ID) {
-  console.warn("[WARN] Env belum lengkap. Pastikan MERCHANT_CODE, API_KEY, ROBLOX_API_KEY, ROBLOX_UNIVERSE_ID terisi.");
-}
-
-async function publishToRoblox(message) {
-  const url = `https://apis.roblox.com/messaging-service/v1/universes/${ROBLOX_UNIVERSE_ID}/topics/${encodeURIComponent(ROBLOX_TOPIC)}`;
-  const payload = { message: JSON.stringify(message) };
-  const headers = { "x-api-key": ROBLOX_API_KEY, "content-type": "application/json" };
-  const res = await axios.post(url, payload, { headers });
-  return res.status;
-}
-
-app.get("/health", (_req, res) => res.send("ok"));
-
-app.post("/webhook/bagibagi", async (req, res) => {
-  try {
-    const d = req.body || {};
-    const msg = {
-      type: "donation",
-      at: new Date().toISOString(),
-      userName: d?.userName ?? "Seseorang",
-      amount: Number(d?.amount ?? 0),
-      message: d?.message ?? "",
-      isVerified: !!d?.isVerified,
-      isAnonymous: !!d?.isAnonymous
-    };
-    await publishToRoblox(msg);
-    res.json({ success: true });
-  } catch (e) {
-    console.error("Webhook error:", e?.response?.data || e.message);
-    res.status(500).json({ success: false, error: "failed forward to roblox" });
-  }
+app.listen(PORT, () => {
+    console.log(`Adapter listening on :${PORT}`);
 });
-
-app.post("/push/latest", async (req, res) => {
-  try {
-    const page = Number(req.body?.page ?? 1);
-    const pageSize = Number(req.body?.pageSize ?? 10);
-    const path = "/api/partnerintegration/transactions";
-    const raw = `${MERCHANT_CODE}${API_KEY}${path}${page}${pageSize}`;
-    const token = CryptoJS.MD5(raw).toString();
-    const url = `${BAGI2_BASE_URL}${path}?page=${page}&pageSize=${pageSize}&merchantCode=${encodeURIComponent(MERCHANT_CODE)}&token=${token}`;
-    const { data } = await axios.get(url);
-    await publishToRoblox({ type: "transactions", at: new Date().toISOString(), raw: data });
-    res.json({ success: true, forwarded: true, count: data?.data?.items?.length || 0 });
-  } catch (e) {
-    console.error("push/latest error:", e?.response?.data || e.message);
-    res.status(500).json({ success: false, error: "failed to fetch/forward" });
-  }
-});
-
-app.post("/test/ping", async (_req, res) => {
-  try {
-    await publishToRoblox({ type: "ping", at: new Date().toISOString() });
-    res.json({ success: true });
-  } catch (e) {
-    console.error("test/ping error:", e?.response?.data || e.message);
-    res.status(500).json({ success: false });
-  }
-});
-app.get("/test/ping", async (req, res) => {
-  try {
-    console.log("[Bagi2] /test/ping (GET) hit");
-    await publishToRoblox({ type: "ping", at: new Date().toISOString() });
-    console.log("[Bagi2] /test/ping forwarded to Roblox");
-    res.json({ success: true });
-  } catch (e) {
-    console.error("[Bagi2] /test/ping error:", e.response?.data || e.message);
-    res.status(500).json({ success: false, error: e.response?.data || e.message });
-  }
-});
-
-app.listen(PORT, () => console.log(`Adapter listening on :${PORT}`));
