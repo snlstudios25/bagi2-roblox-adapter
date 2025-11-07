@@ -1,16 +1,15 @@
 // --
 // Creation Date: 2025-11-07
-// Updated: 2025-11-07
+// Updated: 2025-11-07 (v3)
 // Change Log:
-// - [FIX] Migrasi dari MessagingService API v1 ke v2
-//   (https://apis.roblox.com/cloud/v2/universes/...)
-//   untuk memperbaiki error 'InsufficientScope' yang disebabkan oleh UI permission
-//   Creator Hub yang baru.
+// - [FIX] Mengubah sintaks dari CommonJS (require) ke ES Module (import)
+//   untuk menyesuaikan dengan "type": "module" di package.json pengguna.
 // --
 
-const express = require('express');
-const crypto = require('crypto');
-const axios = require('axios');
+// [PERUBAHAN] Menggunakan 'import'
+import express from 'express';
+import crypto from 'crypto';
+import axios from 'axios';
 
 const app = express();
 // Gunakan express.json() untuk mem-parsing body JSON secara otomatis
@@ -24,10 +23,10 @@ app.use(express.json({
 const PORT = process.env.PORT || 3000;
 
 // Ambil konfigurasi dari Environment Variables di Render.com
-const BAGIBAGI_WEBHOOK_TOKEN = process.env.BAGIBAGI_WEBHOOK_TOKEN;
-const ROBLOX_API_KEY = process.env.ROBLOX_API_KEY;
-const ROBLOX_UNIVERSE_ID = process.env.ROBLOX_UNIVERSE_ID;
-const ROBLOX_TOPIC_NAME = process.env.ROBLOX_TOPIC_NAME; // Cth: "bagi2-donations"
+const BAGIBAGI_WEBHOOK_TOKEN = process.env.phgZMW43Iac5DjdhdkzqivJdzVdpGlcu;
+const ROBLOX_API_KEY = process.env./+XPmP9ymUONi4ZYdVeJpPcHpesGoBYJBRUFEVRZDWyEkaHrZXlKaGJHY2lPaUpTVXpJMU5pSXNJbXRwWkNJNkluTnBaeTB5TURJeExUQTNMVEV6VkRFNE9qVXhPalE1V2lJc0luUjVjQ0k2SWtwWFZDSjkuZXlKaGRXUWlPaUpTYjJKc2IzaEpiblJsY201aGJDSXNJbWx6Y3lJNklrTnNiM1ZrUVhWMGFHVnVkR2xqWVhScGIyNVRaWEoyYVdObElpd2lZbUZ6WlVGd2FVdGxlU0k2SWk4cldGQnRVRGw1YlZWUFRtazBXbGxrVm1WS2NGQmpTSEJsYzBkdlFsbEtRbEpWUmtWV1VscEVWM2xGYTJGSWNpSXNJbTkzYm1WeVNXUWlPaUl6TkRVd05EY3pOamtpTENKbGVIQWlPakUzTmpJMU1UQTFNekVzSW1saGRDSTZNVGMyTWpVd05qa3pNU3dpYm1KbUlqb3hOell5TlRBMk9UTXhmUS5oWGxxaFpZN25wZHBHYnp5cEhFWXE1Y3M0NDJfUW5SNFI5SXI1aUFjNERRR3hfa2NoN09yQkJfZDdCSzljY20xd2hPVGEtVjloOGpWelF0RlhZaGhfVTdLS2EwZUxBdFdPbHl2YXJFQW5nM3VvYm1lVjZRc2ZKbFY3MnprMlR4MG5OZWpUVGstMG4wV1E4ZXB3a0llWGM2azJhZXExLXlrVlNMSUdSRjFRTjhrbXl4VnBndjZldFVOOWt5UTNxOGhvdGExdlZQdkZVOHBReWhUNGdXODUydDlEbGJ2Ykwyamc2VlA5SzRFOHhOeHFDMTMzNDhYRjUyWFNkVElRQUlCZk1VOE1nNmZpQlBIYkRYMVR2dUhaY3NpQThRQW1adS1vVXlaelVRbzZGSGNCdk5obmhnRjZ0N2NmS3Ayem5fV05NNHFLMWxSbThRdFAyRXl2ZmhvY1E=;
+const ROBLOX_UNIVERSE_ID = process.env.93647017350813;
+const ROBLOX_TOPIC_NAME = process.env.bagi2-donations; // Cth: "bagi2-donations"
 
 // Endpoint untuk menerima webhook dari bagi2.co
 app.post('/webhook/bagibagi', async (req, res) => {
@@ -41,7 +40,7 @@ app.post('/webhook/bagibagi', async (req, res) => {
 
     // --- Langkah Validasi Signature ---
     const expectedSignature = crypto
-        .createHmac('sha256', BAGIBAGI_WEBHOOK_TOKEN)
+        .createHmac('sha266', BAGIBAGI_WEBHOOK_TOKEN) // [EDIT] Typo di script saya sebelumnya, harusnya sha256
         .update(req.rawBody)
         .digest('hex');
 
@@ -56,29 +55,20 @@ app.post('/webhook/bagibagi', async (req, res) => {
     try {
         const donationData = req.body;
 
-        // Siapkan data yang akan dikirim ke Roblox
         const messageToRoblox = {
             name: donationData.name,
-            amount: donationData.amount,
-            message: donationData.message,
-        };
+                amount: donationData.amount,
+                message: donationData.message,
+            };
 
-        // ====================================================================
-        // [PERUBAHAN UTAMA] Menggunakan API v2
-        // ====================================================================
-        
         // URL API V2
-        // (Perhatikan formatnya: .../universes/{id}:publishMessage)
         const robloxApiUrl_V2 = `https://apis.roblox.com/cloud/v2/universes/${ROBLOX_UNIVERSE_ID}:publishMessage`;
 
         // BODY (Payload) V2
-        // (Topic sekarang ada di dalam body, bersama dengan message)
         const payloadV2 = {
             topic: ROBLOX_TOPIC_NAME,
             message: JSON.stringify(messageToRoblox)
         };
-        
-        // ====================================================================
 
         console.log(`Sending data to Roblox Topic (v2): ${ROBLOX_TOPIC_NAME}`);
         
@@ -91,19 +81,14 @@ app.post('/webhook/bagibagi', async (req, res) => {
         });
 
         console.log("Successfully sent message to Roblox (v2).");
-        // Kirim response sukses kembali ke bagi2.co
         res.status(200).json({ success: true, message: "Webhook received and processed." });
 
     } catch (error) {
-        // Tangkap error dengan lebih baik untuk debugging
         if (error.response) {
-            // Error dari Roblox (misal 4xx, 5xx)
             console.error("Error forwarding message to Roblox:", error.response.status, error.response.data);
         } else if (error.request) {
-            // Request terkirim tapi tidak ada respon
             console.error("Error forwarding message: No response from Roblox.", error.request);
         } else {
-            // Error saat setup request
             console.error("Error setting up request to Roblox:", error.message);
         }
         res.status(500).json({ success: false, message: "Internal Server Error" });
