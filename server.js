@@ -1,12 +1,9 @@
 // --
 // Creation Date: 2025-11-07
-// Updated: 2025-11-07 (v5 - Mundur ke API V1)
+// Updated: 2025-11-07 (v6 - Final Fix)
 // Change Log:
-// - [REVERT] Mengembalikan ke API v1 MessagingService.
-//   Teori: UI Roblox bug dan hanya memberikan izin V1 (universe-messaging-service:publish).
-//   Kita akan coba V1 API untuk dicocokkan dengan V1 Izin.
-// - [KEEP] Tetap menggunakan 'import' (ES Module).
-// - [KEEP] Tetap menggunakan '/health' endpoint.
+// - [FIX] Mengubah nama variabel dari ROBLOX_TOPIC_NAME menjadi ROBLOX_TOPIC
+//   agar cocok dengan pengaturan Environment Variable di Render.com.
 // --
 
 import express from 'express';
@@ -25,7 +22,12 @@ const PORT = process.env.PORT || 3000;
 const BAGIBAGI_WEBHOOK_TOKEN = process.env.BAGIBAGI_WEBHOOK_TOKEN;
 const ROBLOX_API_KEY = process.env.ROBLOX_API_KEY;
 const ROBLOX_UNIVERSE_ID = process.env.ROBLOX_UNIVERSE_ID;
-const ROBLOX_TOPIC_NAME = process.env.ROBLOX_TOPIC_NAME; 
+
+// ====================================================================
+// [PERUBAHAN DI SINI]
+// Nama variabel diubah agar cocok dengan setting Render.com Anda
+const ROBLOX_TOPIC_NAME = process.env.ROBLOX_TOPIC; 
+// ====================================================================
 
 // Health Check Endpoint untuk Render.com
 app.get('/health', (req, res) => {
@@ -65,23 +67,14 @@ app.post('/webhook/bagibagi', async (req, res) => {
             message: donationData.message,
         };
 
-        // ====================================================================
-        // [PERUBAHAN UTAMA] Menggunakan API v1
-        // ====================================================================
-        
-        // URL API V1 (Topik ada di URL)
         const robloxApiUrl_V1 = `https://apis.roblox.com/messaging-service/v1/universes/${ROBLOX_UNIVERSE_ID}/topics/${ROBLOX_TOPIC_NAME}`;
         
-        // BODY (Payload) V1
         const payloadV1 = {
             message: JSON.stringify(messageToRoblox)
         };
         
-        // ====================================================================
-
         console.log(`Sending data to Roblox Topic (v1): ${ROBLOX_TOPIC_NAME}`);
         
-        // Kirim request ke API V1
         await axios.post(robloxApiUrl_V1, payloadV1, {
             headers: {
                 'x-api-key': ROBLOX_API_KEY,
